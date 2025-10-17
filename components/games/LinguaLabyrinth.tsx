@@ -130,43 +130,36 @@ const LinguaLabyrinth: React.FC = () => {
 
   // Validate currentLang
   useEffect(() => {
-    if (!languages[currentLang]) {
-      console.warn(`Invalid language code: ${currentLang}. Defaulting to 'en'.`)
-      setCurrentLang("en")
+  if (typeof window === "undefined") return;
+
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    setStatus("Speech recognition not supported. Please use Chrome or Edge.");
+    return;
+  }
+
+  try {
+    const recognition = new SpeechRec();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = languages[currentLang]?.langCode || languages.en.langCode;
+
+    // Stop any previous recognition
+    if (gameState.recognition && typeof gameState.recognition.stop === "function") {
+      gameState.recognition.stop();
     }
-  }, [currentLang])
 
-  // Setup speech recognition
-  useEffect(() => {
-    if (typeof window === "undefined") return
+    // Add event listeners here to catch initialization issues
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setStatus(`Initialization error: ${event.error || "unknown"}`);
+    };
 
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRec) {
-      setStatus("Speech recognition not supported. Please use Chrome or Edge.")
-      return
-    }
-
-    try {
-      const recognition = new SpeechRec()
-      recognition.continuous = false
-      recognition.interimResults = false
-      recognition.lang = languages[currentLang]?.langCode || languages.en.langCode
-
-      if (gameState.recognition && typeof gameState.recognition.stop === "function") {
-        try {
-          gameState.recognition.stop()
-        } catch (e) {
-          console.warn("Error stopping previous recognition:", e)
-        }
-      }
-
-      setGameState((prev) => ({ ...prev, recognition }))
-    } catch (err) {
-      console.warn("Could not initialize SpeechRecognition:", err)
-      setStatus("Speech recognition initialization failed")
-    }
-  }, [currentLang])
-
+    setGameState((prev) => ({ ...prev, recognition }));
+  } catch (err) {
+    console.warn("Could not initialize SpeechRecognition:", err);
+    setStatus("Speech recognition initialization failed");
+  }
+}, [currentLang]);
   // Select voice
   const selectVoice = useCallback(() => {
     if (!gameState.synth) {
@@ -358,57 +351,68 @@ const LinguaLabyrinth: React.FC = () => {
 
   // Start listening & handle results
   const startListening = () => {
-    const recognition = gameState.recognition
-    const challenge = gameState.currentChallenge
-    if (!recognition || !challenge) {
-      setStatus("Error: Speech recognition or challenge not available")
-      return
-    }
+  const recognition = gameState.recognition;
+  const challenge = gameState.currentChallenge;
+  if (!recognition || !challenge) {
+    setStatus("Error: Speech recognition or challenge not available");
+    return;
+  }
 
-    micBtnRef.current?.classList.add("mic-listening")
-    setStatus("Listening... 🗣")
-    setTranscript("")
+  micBtnRef.current?.classList.add("mic-listening");
+  setStatus("Listening... 🗣");
+  setTranscript("");
 
-  recognition.onresult = (event: SpeechRecognitionEvent) => {
-    try {
-      const resultList = event.results[0];
-      if (resultList && resultList.length > 0) {
-        const userTranscript = resultList[0].transcript || "";
-        setTranscript(userTranscript);
-        const result = checkPronunciation(userTranscript, challenge.correct);
+  // Request microphone permission if not granted
+  if (typeof recognition.start === "function") {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      try {
+        const resultList = event.results[0];
+        if (resultList && resultList.length > 0) {
+          const userTranscript = resultList[0].transcript || "";
+          console.log("Transcript:", userTranscript); // Debug log
+          setTranscript(userTranscript);
+          const result = checkPronunciation(userTranscript, challenge.correct);
 
-        if (result.isCorrect) {
-          setStatus(`✅ Perfect! (${Math.round(result.wordAccuracy * 100)}% match)`);
-          successMove();
-          setGameState((prev) => ({ ...prev, score: prev.score + 10 * prev.level }));
-          setTimeout(() => nextChallenge().catch(() => {}), 1000);
-        } else {
-          setStatus(`❌ Not quite! (${Math.round(result.wordAccuracy * 100)}% match)`);
-          speakAICorrection();
+          if (result.isCorrect) {
+            setStatus(`✅ Perfect! (${Math.round(result.wordAccuracy * 100)}% match)`);
+            successMove();
+            setGameState((prev) => ({ ...prev, score: prev.score + 10 * prev.level }));
+            setTimeout(() => nextChallenge().catch(() => {}), 1000);
+          } else {
+            setStatus(`❌ Not quite! (${Math.round(result.wordAccuracy * 100)}% match)`);
+            speakAICorrection();
+          }
         }
+      } catch (err) {
+        console.error("onresult error:", err);
+        setStatus("Error processing speech input");
       }
-    } catch (err) {
-      console.error("onresult error:", err);
-      setStatus("Error processing speech input");
-    }
-  };
+    };
+
     recognition.onend = () => {
-      micBtnRef.current?.classList.remove("mic-listening")
-      setStatus((s) => (s.includes("Click") ? s : "Click to speak again"))
-    }
+      micBtnRef.current?.classList.remove("mic-listening");
+      setStatus((s) => (s.includes("Click") ? s : "Click to speak again"));
+    };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      setStatus(`Error: ${event.error || "unknown"}`)
-      micBtnRef.current?.classList.remove("mic-listening")
-    }
+      setStatus(`Error: ${event.error || "unknown"}`);
+      if (event.error === "not-allowed" || event.error === "permission-denied") {
+        setStatus("Please allow microphone access in your browser settings.");
+      }
+      micBtnRef.current?.classList.remove("mic-listening");
+    };
 
     try {
-      recognition.start()
+      recognition.start();
+      console.log("Speech recognition started"); // Debug log
     } catch (err) {
-      console.warn("Recognition start error:", err)
-      setStatus("Error starting speech recognition")
+      console.warn("Recognition start error:", err);
+      setStatus("Error starting speech recognition");
     }
+  } else {
+    setStatus("Speech recognition not available");
   }
+};
 
   const speakAICorrection = (text?: string) => {
     if (!gameState.currentChallenge || !gameState.synth) {
