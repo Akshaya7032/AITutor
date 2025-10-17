@@ -13,7 +13,7 @@ function VoiceRecorder() {
     if (isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      setStatus("⏳ Processing audio...");
+      setStatus("Processing audio...");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -32,13 +32,13 @@ function VoiceRecorder() {
     }
   };
 
-  // 🚀 Send audio to backend
+  // Send audio to backend and handle response
   const handleSendAudio = async () => {
     const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.webm");
 
-    setStatus("🪶 Sending to server...");
+    setStatus("Sending to server...");
     setOriginalText("Waiting for result...");
     setCorrectedText("Improving with GPT...");
 
@@ -52,23 +52,37 @@ function VoiceRecorder() {
         throw new Error(`Server error: ${response.status}`);
       }
 
-      const result = await response.json();
-      console.log("✅ Backend Response:", result);
+      // Check if response is audio
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("audio/wav")) {
+        // Extract text data from headers
+        const originalText = response.headers.get("X-Original-Text") || "No transcription";
+        const correctedText = response.headers.get("X-Corrected-Text") || "No correction";
+        const language = response.headers.get("X-Language") || "Unknown";
 
-      if (result.original && result.corrected) {
-        setOriginalText(result.original);
-        setCorrectedText(result.corrected);
-        setStatus("✅ Done! Check below 👇");
-      } else if (result.error) {
-        setStatus("❌ Error during transcription.");
-        setOriginalText("—");
-        setCorrectedText(result.error);
+        setOriginalText(originalText);
+        setCorrectedText(correctedText);
+        setStatus(`Done! Playing audio (Language: ${language})`);
+
+        // Handle audio playback
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.play().catch((error) => {
+          console.error("Audio play failed:", error);
+          setStatus("Done! Audio play failed. Check console.");
+        });
       } else {
-        setStatus("⚠️ Unexpected response format.");
+        // Fallback for unexpected JSON (though backend should return audio)
+        const result = await response.json();
+        console.log("Unexpected JSON response:", result);
+        setStatus("Unexpected response format.");
+        setOriginalText("—");
+        setCorrectedText("—");
       }
     } catch (error) {
       console.error("Upload failed:", error);
-      setStatus("❌ Upload failed. Check console.");
+      setStatus("Upload failed. Check console.");
     }
   };
 
@@ -107,7 +121,7 @@ function VoiceRecorder() {
           marginTop: "30px",
         }}
       >
-        <h3>🗒️ Transcription Results:</h3>
+        <h3>Transcription Results:</h3>
         <p>
           <strong>Original:</strong> {originalText}
         </p>
