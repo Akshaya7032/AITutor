@@ -598,7 +598,7 @@ const LinguaLabyrinth: React.FC = () => {
       <AppNav />
       <main className="min-h-screen bg-gradient-to-br from-[#667eea] to-[#764ba2] flex justify-center items-center p-4">
         <div className="relative w-full max-w-4xl">
-          <div className="absolute top-4 right-4 bg-white/90 rounded-lg p-2">
+          <div className="absolute top-4 right-4 bg-white/90 rounded-lg p-2 text-gray-900">
             <select
               value={currentLang}
               onChange={(e) => {
@@ -679,9 +679,9 @@ const LinguaLabyrinth: React.FC = () => {
 
               <Card className="bg-[#f1f2f6] border-none">
                 <CardContent className="p-4 grid grid-cols-3 gap-2">
-                  <div className="bg-white p-2 rounded-lg text-center">⭐ <span>{gameState.score}</span></div>
-                  <div className="bg-white p-2 rounded-lg text-center">🏆 <span>{gameState.level}</span></div>
-                  <div className="bg-white p-2 rounded-lg text-center">📚 <span>{gameState.vocabCollected}</span></div>
+                  <div className="bg-white p-2 rounded-lg text-center text-gray-900">⭐ <span>{gameState.score}</span></div>
+                  <div className="bg-white p-2 rounded-lg text-center text-gray-900">🏆 <span>{gameState.level}</span></div>
+                  <div className="bg-white p-2 rounded-lg text-center text-gray-900">📚 <span>{gameState.vocabCollected}</span></div>
                 </CardContent>
               </Card>
             </div>
