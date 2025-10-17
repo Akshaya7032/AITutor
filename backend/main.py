@@ -1,13 +1,12 @@
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import whisper
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import tempfile
-import torch
+import requests
 
 app = FastAPI()
 
-# Allow frontend
+# Allow frontend CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,14 +15,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 Load models once (on startup)
-print("🔹 Loading Whisper model (base)...")
+# Load Whisper model
+print("🔹 Loading Whisper model (medium)...")
 whisper_model = whisper.load_model("medium")
 
-print("🔹 Loading Grammar correction model (Hugging Face)...")
-grammar_model_name = "pszemraj/flan-t5-large-grammar-synthesis"
-tokenizer = AutoTokenizer.from_pretrained(grammar_model_name)
-grammar_model = AutoModelForSeq2SeqLM.from_pretrained(grammar_model_name)
+
+LT_API_URL = "https://api.languagetool.org/v2/check"
+LT_API_KEY = "" 
+
+def correct_grammar_langtool(text: str, language: str) -> str:
+    """
+    Correct grammar using LanguageTool API.
+    Supports 30+ languages (e.g., 'en-US', 'es', 'fr', 'de').
+    """
+    if not text.strip():
+        return text
+    
+    params = {
+        "text": text,
+        "language": language,  # e.g., 'en-US' for English, 'es' for Spanish
+    }
+    if LT_API_KEY and LT_API_KEY != "":
+        params["access_token"] = LT_API_KEY
+    
+    try:
+        response = requests.post(LT_API_URL, data=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Reconstruct corrected text
+        corrected = text
+        replacements = data.get("matches", [])
+        offset = 0
+        for match in sorted(replacements, key=lambda m: m["offset"], reverse=True):
+            start = match["offset"] + offset
+            end = start + match["length"]
+            replacement = match["replacements"][0]["value"] if match.get("replacements") else match.get("message", "")
+            corrected = corrected[:start] + replacement + corrected[end:]
+            offset += len(replacement) - match["length"]
+        
+        return corrected.strip()
+    except Exception as e:
+        print(f"❌ LanguageTool error: {e}")
+        return text  # Fallback to original
 
 @app.post("/transcribe/")
 async def transcribe_audio(file: UploadFile):
@@ -38,20 +72,21 @@ async def transcribe_audio(file: UploadFile):
         print("🎙️ Transcribing with Whisper...")
         result = whisper_model.transcribe(temp_audio_path)
         text = result["text"].strip()
-        print("🟢 Transcription complete:", text)
+        language = result["language"]
+        print(f"🟢 Transcription complete: {text} (Language: {language})")
 
-        print("🪶 Correcting grammar...")
-        input_text = f"correct the grammar and phrasing of this sentence: {text}"
-        inputs = tokenizer(input_text, return_tensors="pt", truncation=True)
-
-        with torch.no_grad():
-            outputs = grammar_model.generate(**inputs, max_length=256)
-            corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
+        # Apply grammar correction for any supported language
+        print("🪶 Correcting grammar with LanguageTool...")
+        corrected_text = correct_grammar_langtool(text, f"{language}-US" if language == "en" else language)
         print("✅ Correction complete:", corrected_text)
-
-        return {"original": text, "corrected": corrected_text}
-
+        
+        return {
+            "original": text,
+            "corrected": corrected_text,
+            "language": language,
+            "grammar_corrected": bool(corrected_text != text)  # True if corrections were made
+        }
+    
     except Exception as e:
         print("❌ Error:", e)
         return {"error": str(e)}
