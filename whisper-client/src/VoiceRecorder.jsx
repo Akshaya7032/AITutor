@@ -1,64 +1,74 @@
 import React, { useState, useRef } from "react";
-import axios from "axios";
 
-const VoiceRecorder = () => {
-  const [recording, setRecording] = useState(false);
-  const [audioUrl, setAudioUrl] = useState(null);
-  const [transcript, setTranscript] = useState(null);
+function VoiceRecorder() {
+  const [isRecording, setIsRecording] = useState(false);
+  const [originalText, setOriginalText] = useState("Waiting for result...");
+  const [correctedText, setCorrectedText] = useState("Improving with GPT...");
+  const [status, setStatus] = useState("Click to start recording 🎤");
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  const BACKEND_URL = "http://127.0.0.1:8000/transcribe/"; // Change if deployed
-
-  const toggleRecording = async () => {
-    if (!recording) {
-      // Start recording
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
-
-        mediaRecorder.ondataavailable = (event) => {
-          audioChunksRef.current.push(event.data);
-        };
-
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-          const audioFile = new File([audioBlob], "recording.webm", { type: "audio/webm" });
-          const url = URL.createObjectURL(audioBlob);
-          setAudioUrl(url);
-
-          // Send to FastAPI
-          const formData = new FormData();
-          formData.append("file", audioFile);
-
-          setTranscript({ original_transcript: "Processing...", corrected_transcript: "" });
-
-          try {
-            const res = await axios.post(BACKEND_URL, formData, {
-              headers: { "Content-Type": "multipart/form-data" },
-            });
-            setTranscript(res.data);
-          } catch (error) {
-            console.error("Transcription failed:", error);
-            setTranscript({
-              original_transcript: "❌ Error transcribing audio",
-              corrected_transcript: "",
-            });
-          }
-        };
-
-        mediaRecorder.start();
-        setRecording(true);
-      } catch (err) {
-        console.error("Microphone access denied:", err);
-        alert("Please allow microphone access to record audio.");
-      }
-    } else {
-      // Stop recording
+  // 🎙 Start or stop recording
+  const handleRecord = async () => {
+    if (isRecording) {
       mediaRecorderRef.current.stop();
-      setRecording(false);
+      setIsRecording(false);
+      setStatus("⏳ Processing audio...");
+    } else {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = handleSendAudio;
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setStatus("🎙 Recording... Click again to stop");
+    }
+  };
+
+  // 🚀 Send audio to backend
+  const handleSendAudio = async () => {
+    const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+    const formData = new FormData();
+    formData.append("file", audioBlob, "recording.webm");
+
+    setStatus("🪶 Sending to server...");
+    setOriginalText("Waiting for result...");
+    setCorrectedText("Improving with GPT...");
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/transcribe/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("✅ Backend Response:", result);
+
+      if (result.original && result.corrected) {
+        setOriginalText(result.original);
+        setCorrectedText(result.corrected);
+        setStatus("✅ Done! Check below 👇");
+      } else if (result.error) {
+        setStatus("❌ Error during transcription.");
+        setOriginalText("—");
+        setCorrectedText(result.error);
+      } else {
+        setStatus("⚠️ Unexpected response format.");
+      }
+    } catch (error) {
+      console.error("Upload failed:", error);
+      setStatus("❌ Upload failed. Check console.");
     }
   };
 
@@ -66,62 +76,47 @@ const VoiceRecorder = () => {
     <div
       style={{
         textAlign: "center",
-        padding: "2rem",
-        fontFamily: "Arial, sans-serif",
+        color: "white",
+        fontFamily: "Poppins, sans-serif",
       }}
     >
-      <h2>🎧 Virtual AI Language Coach</h2>
-      <p>Click below to start or stop recording your speech.</p>
-
       <button
-        onClick={toggleRecording}
+        onClick={handleRecord}
         style={{
-          backgroundColor: recording ? "#d9534f" : "#5cb85c",
-          color: "white",
-          padding: "12px 25px",
-          borderRadius: "8px",
+          padding: "15px 40px",
+          fontSize: "1.2rem",
+          fontWeight: "bold",
+          backgroundColor: isRecording ? "#ff4d4d" : "#4CAF50",
           border: "none",
+          borderRadius: "50px",
+          color: "white",
           cursor: "pointer",
-          fontSize: "16px",
-          marginBottom: "1rem",
+          transition: "all 0.3s ease",
         }}
       >
-        {recording ? "🛑 Stop Recording" : "🎙️ Start Recording"}
+        {isRecording ? "⏹ Stop Recording" : "🎙 Start Recording"}
       </button>
 
-      {audioUrl && (
-        <div style={{ marginTop: "1rem" }}>
-          <p>🎵 Playback:</p>
-          <audio src={audioUrl} controls />
-        </div>
-      )}
+      <p style={{ marginTop: "20px", fontSize: "1rem" }}>{status}</p>
 
-      {transcript && (
-        <div
-          style={{
-            background: "#f9f9f9",
-            borderRadius: "10px",
-            padding: "1rem",
-            marginTop: "1.5rem",
-            width: "80%",
-            marginLeft: "auto",
-            marginRight: "auto",
-            textAlign: "left",
-          }}
-        >
-          <h3>🗒️ Transcription Results:</h3>
-          <p>
-            <strong>Original:</strong>{" "}
-            {transcript.original_transcript || "Waiting for result..."}
-          </p>
-          <p>
-            <strong>Corrected:</strong>{" "}
-            {transcript.corrected_transcript || "Improving with GPT..."}
-          </p>
-        </div>
-      )}
+      <div
+        style={{
+          background: "rgba(255,255,255,0.1)",
+          borderRadius: "12px",
+          padding: "20px",
+          marginTop: "30px",
+        }}
+      >
+        <h3>🗒️ Transcription Results:</h3>
+        <p>
+          <strong>Original:</strong> {originalText}
+        </p>
+        <p>
+          <strong>Corrected:</strong> {correctedText}
+        </p>
+      </div>
     </div>
   );
-};
+}
 
 export default VoiceRecorder;

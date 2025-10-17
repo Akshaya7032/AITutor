@@ -17,7 +17,7 @@ app.add_middleware(
 )
 
 # 🧠 Load models once (on startup)
-print("🔹 Loading Whisper model (large)...")
+print("🔹 Loading Whisper model (base)...")
 whisper_model = whisper.load_model("medium")
 
 print("🔹 Loading Grammar correction model (Hugging Face)...")
