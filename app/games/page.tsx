@@ -5,7 +5,7 @@ import { AppNav } from "@/components/nav"
 import { AppProvider } from "@/components/providers/app-provider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { LinguaLabyrinth } from "@/components/games/Lingua-Labyrinth"
+import LinguaLabyrinth from "@/components/games/LinguaLabyrinth"
 import { SentenceBuilderGame } from "@/components/games/sentence-builder-game"
 import { ListeningChallengeGame } from "@/components/games/listening-challenge-game"
 import { TenseMasterGame } from "@/components/games/tense-master-game"
@@ -26,7 +26,7 @@ function GamesInner() {
         <Button variant="outline" onClick={() => setSelectedGame(null)}>
           Back to Games
         </Button>
-        {selectedGame === "maze" && <LinguaLabyrinth />}
+        {selectedGame === "LinguaLabyrinth" && <LinguaLabyrinth />}
         {selectedGame === "sentence-builder" && <SentenceBuilderGame />}
         {selectedGame === "listening-challenge" && <ListeningChallengeGame />}
         {selectedGame === "tense-master" && <TenseMasterGame />}

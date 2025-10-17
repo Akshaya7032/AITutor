@@ -369,27 +369,29 @@ const LinguaLabyrinth: React.FC = () => {
     setStatus("Listening... 🗣")
     setTranscript("")
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      try {
-        const userTranscript = event.results?.[0]?.[0]?.transcript || ""
-        setTranscript(userTranscript)
-        const result = checkPronunciation(userTranscript, challenge.correct)
+  recognition.onresult = (event: SpeechRecognitionEvent) => {
+    try {
+      const resultList = event.results[0];
+      if (resultList && resultList.length > 0) {
+        const userTranscript = resultList[0].transcript || "";
+        setTranscript(userTranscript);
+        const result = checkPronunciation(userTranscript, challenge.correct);
 
         if (result.isCorrect) {
-          setStatus(`✅ Perfect! (${Math.round(result.wordAccuracy * 100)}% match)`)
-          successMove()
-          setGameState((prev) => ({ ...prev, score: prev.score + 10 * prev.level }))
-          setTimeout(() => nextChallenge().catch(() => {}), 1000)
+          setStatus(`✅ Perfect! (${Math.round(result.wordAccuracy * 100)}% match)`);
+          successMove();
+          setGameState((prev) => ({ ...prev, score: prev.score + 10 * prev.level }));
+          setTimeout(() => nextChallenge().catch(() => {}), 1000);
         } else {
-          setStatus(`❌ Not quite! (${Math.round(result.wordAccuracy * 100)}% match)`)
-          speakAICorrection()
+          setStatus(`❌ Not quite! (${Math.round(result.wordAccuracy * 100)}% match)`);
+          speakAICorrection();
         }
-      } catch (err) {
-        console.error("onresult error:", err)
-        setStatus("Error processing speech input")
       }
+    } catch (err) {
+      console.error("onresult error:", err);
+      setStatus("Error processing speech input");
     }
-
+  };
     recognition.onend = () => {
       micBtnRef.current?.classList.remove("mic-listening")
       setStatus((s) => (s.includes("Click") ? s : "Click to speak again"))
@@ -459,7 +461,6 @@ const LinguaLabyrinth: React.FC = () => {
       comando: "¡Abre! ¡Corre! ¡Para!",
       passé: "Passé: allé, vins, mangeai",
       description: "Adjectifs: grand, rouge, beau",
-      question: "Où? Que? Comment?",
       présent: "Présent: marche, vais, mange",
       commande: "Ouvre! Cours! Arrête!",
       Vergangenheit: "Vergangenheit: ging, kam, aß",
