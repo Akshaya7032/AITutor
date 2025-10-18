@@ -6,18 +6,18 @@ import { AppProvider } from "@/components/providers/app-provider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import LinguaLabyrinth from "@/components/games/LinguaLabyrinth"
-import { SentenceBuilderGame } from "@/components/games/sentence-builder-game"
-import { ListeningChallengeGame } from "@/components/games/listening-challenge-game"
+import  SentenceBuilderGame  from "@/components/games/sentence-builder-game"
+import ListeningChallengeGame from "@/components/games/listening-challenge-game"
 import { TenseMasterGame } from "@/components/games/tense-master-game"
 
 function GamesInner() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
 
   const games = [
-    { id: "LinguaLabyrinth", name: "LinguaLabyrinth", description: "Pronounce the sentence perfectly to move on" },
+    { id: "LinguaLabyrinth", name: "The Maze", description: "Reach your destination!" },
     { id: "sentence-builder", name: "Sentence Builder", description: "Arrange words to form sentences" },
-    { id: "listening-challenge", name: "Listening Challenge", description: "Listen and repeat the same" },
-    { id: "tense-master", name: "Tense Master", description: "Master verb conjugations" },
+    { id: "listening-challenge", name: "AI Phrase Builder Game", description: "Build your fluency" },
+    
   ]
 
   if (selectedGame) {
